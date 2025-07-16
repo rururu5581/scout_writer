@@ -1,0 +1,5 @@
+{
+  "name": "morich scout writer",
+  "description": "An application that leverages the Gemini API to generate compelling, personalized scout emails for potential job candidates, embodying the voice of a top consultant from morich Inc.",
+  "requestFramePermissions": []
+}
