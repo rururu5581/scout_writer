@@ -1,11 +1,42 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-// The platform is expected to provide process.env.API_KEY.
-// We are removing the explicit check that throws an error during module initialization
-// to prevent the entire app from crashing with a white screen if the key is not set.
-// The error will now be caught when the API call is made, which allows the UI to render.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// We will initialize the GoogleGenAI instance lazily (on first use)
+// to prevent the entire application from crashing with a white screen if the
+// API_KEY environment variable is not set on startup.
+let ai: GoogleGenAI | null = null;
+
+/**
+ * Safely gets the API key from the environment.
+ * In browser environments like Vite on Vercel, `process` might not be defined.
+ * This function prevents a "ReferenceError: process is not defined" crash.
+ */
+const getApiKey = (): string | undefined => {
+  // Check if `process` and `process.env` exist before accessing the API key.
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
+  }
+  return undefined;
+}
+
+/**
+ * Returns a singleton instance of the GoogleGenAI client.
+ * Throws an error if the API key is not configured.
+ */
+const getAiInstance = (): GoogleGenAI => {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    // This user-friendly error will be caught by the calling function's try-catch block
+    // and displayed in the UI, instead of crashing the app.
+    throw new Error("APIキーが設定されていません。Vercelなどのホスティングサービスで環境変数を設定したか確認してください。");
+  }
+
+  if (!ai) {
+    // Initialize the client only once.
+    ai = new GoogleGenAI({ apiKey });
+  }
+
+  return ai;
+};
 
 const buildPrompt = (resume: string, jobInfo: string): string => {
   return `
@@ -71,16 +102,22 @@ ${jobInfo || '指定なし。候補者の経験が最も活かせる、魅力的
 export const generateScoutEmail = async (resume: string, jobInfo: string): Promise<string> => {
   const prompt = buildPrompt(resume, jobInfo);
   try {
-    const response = await ai.models.generateContent({
+    // Lazily get the AI client instance. This will throw an error if the API key is missing,
+    // which we'll catch and display to the user.
+    const aiInstance = getAiInstance();
+    const response = await aiInstance.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: prompt,
     });
     return response.text;
   } catch (error) {
     console.error("Gemini API call failed:", error);
-    if (error instanceof Error && /API.*key.*not.*valid|invalid.*API.*key|API_KEY_INVALID/i.test(error.message)) {
-      throw new Error("APIキーが設定されていないか、無効です。アプリケーションの環境設定を確認してください。");
+    // Re-throw the error so the UI layer can catch it and display a specific message.
+    // This will include our custom "API key not set" message.
+    if (error instanceof Error) {
+      throw error;
     }
-    throw new Error("スカウト文面の生成に失敗しました。時間をおいて再度お試しください。");
+    // Fallback for non-standard errors
+    throw new Error("スカウト文面の生成中に不明なエラーが発生しました。");
   }
 };
