@@ -6,14 +6,19 @@ import { GoogleGenAI } from "@google/genai";
 let ai: GoogleGenAI | null = null;
 
 /**
- * Safely gets the API key from the environment.
- * In browser environments like Vite on Vercel, `process` might not be defined.
- * This function prevents a "ReferenceError: process is not defined" crash.
+ * Safely gets the API key from the environment variables provided by Vite.
+ * Vite exposes environment variables prefixed with `VITE_` on the `import.meta.env` object.
+ *
+ * The user must set an environment variable named `VITE_API_KEY` in their Vercel project settings.
  */
 const getApiKey = (): string | undefined => {
-  // Check if `process` and `process.env` exist before accessing the API key.
-  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-    return process.env.API_KEY;
+  // In a Vite project, environment variables for the client-side
+  // are accessed via `import.meta.env`. In Vercel, these must be prefixed,
+  // typically with `VITE_`.
+  // @ts-ignore
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    // @ts-ignore
+    return import.meta.env.VITE_API_KEY;
   }
   return undefined;
 }
@@ -27,7 +32,7 @@ const getAiInstance = (): GoogleGenAI => {
   if (!apiKey) {
     // This user-friendly error will be caught by the calling function's try-catch block
     // and displayed in the UI, instead of crashing the app.
-    throw new Error("APIキーが設定されていません。Vercelなどのホスティングサービスで環境変数を設定したか確認してください。");
+    throw new Error("APIキーが設定されていません。Vercelのプロジェクト設定で `VITE_API_KEY` という名前の環境変数を設定してください。");
   }
 
   if (!ai) {
