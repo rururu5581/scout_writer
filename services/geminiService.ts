@@ -1,13 +1,11 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable is not set.");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+// The platform is expected to provide process.env.API_KEY.
+// We are removing the explicit check that throws an error during module initialization
+// to prevent the entire app from crashing with a white screen if the key is not set.
+// The error will now be caught when the API call is made, which allows the UI to render.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const buildPrompt = (resume: string, jobInfo: string): string => {
   return `
@@ -80,6 +78,9 @@ export const generateScoutEmail = async (resume: string, jobInfo: string): Promi
     return response.text;
   } catch (error) {
     console.error("Gemini API call failed:", error);
-    throw new Error("Failed to generate content from Gemini API.");
+    if (error instanceof Error && /API.*key.*not.*valid|invalid.*API.*key|API_KEY_INVALID/i.test(error.message)) {
+      throw new Error("APIキーが設定されていないか、無効です。アプリケーションの環境設定を確認してください。");
+    }
+    throw new Error("スカウト文面の生成に失敗しました。時間をおいて再度お試しください。");
   }
 };
